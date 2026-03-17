@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusFlow | Productivity Timer</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        rose: {
+                            400: '#fb7185',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                        },
+                        zinc: {
+                            850: '#202022',
+                            900: '#18181b',
+                            950: '#09090b',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.2s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Styles & Overrides */
+        body {
+            -webkit-tap-highlight-color: transparent;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* SVG Circular Timer */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* Hide scrollbar for clean history list */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Custom Scrollbar for modals */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #52525b;
+            border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #3f3f46;
+        }
+
+        /* Modal Glass Effect */
+        .modal-backdrop {
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        /* Focus Ring */
+        *:focus-visible {
+            outline: 2px solid #f43f5e;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        input:focus-visible {
+            outline: none;
+        }
+
+        /* ==================== NEW STYLES ADDED FOR ENHANCEMENTS ==================== */
+        /* Tag buttons */
+        .tag-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tag-btn.active {
+            background-color: #f43f5e !important;
+            color: white !important;
+            border-color: #f43f5e !important;
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.2);
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #3f3f46;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #f43f5e;
+        }
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Range slider accent */
+        input[type="range"] {
+            accent-color: #f43f5e;
+        }
+    </style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50 min-h-screen flex flex-col items-center py-6 px-4 sm:px-6 relative overflow-x-hidden selection:bg-rose-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="w-full max-w-lg flex justify-between items-center mb-8 animate-fade-in">
+        <div class="flex items-center gap-2 text-rose-500">
+            <i class="fa-solid fa-layer-group text-xl"></i>
+            <h1 class="font-display font-bold text-2xl tracking-tight text-zinc-900 dark:text-white">FocusFlow</h1>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="btnStats" class="p-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors shadow-sm" aria-label="Statistics">
+                <i class="fa-solid fa-chart-simple"></i>
+            </button>
+            <button id="btnSettings" class="p-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors shadow-sm" aria-label="Settings">
+                <i class="fa-solid fa-gear"></i>
+            </button>
+            <button id="btnTheme" class="p-2.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors shadow-sm" aria-label="Toggle Theme">
+                <i class="fa-solid fa-moon" id="themeIcon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="w-full max-w-lg flex-1 flex flex-col items-center animate-slide-up">
+        
+        <!-- Task Input + Category Tags -->
+        <div class="w-full mb-6 relative group">
+            <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-zinc-400 group-focus-within:text-rose-500 transition-colors">
+                <i class="fa-solid fa-pencil text-sm"></i>
+            </div>
+            <input type="text" id="taskInput" placeholder="What are you focusing on?" 
+                class="w-full bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl py-4 pl-12 pr-4 text-center font-medium text-lg text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:border-rose-500 dark:focus:border-rose-500 transition-all shadow-sm">
+        </div>
+
+        <!-- NEW: Task Categories / Tags (single select) -->
+        <div id="categoryTags" class="flex gap-2 justify-center flex-wrap mb-8">
+            <button data-category="Work" class="tag-btn px-5 py-1.5 text-sm font-medium rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-500">Work</button>
+            <button data-category="Study" class="tag-btn px-5 py-1.5 text-sm font-medium rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-500">Study</button>
+            <button data-category="Creative" class="tag-btn px-5 py-1.5 text-sm font-medium rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-500">Creative</button>
+            <button data-category="Personal" class="tag-btn px-5 py-1.5 text-sm font-medium rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-rose-500">Personal</button>
+        </div>
+
+        <!-- Mode Tabs -->
+        <div class="w-full flex p-1.5 bg-zinc-200 dark:bg-zinc-900 rounded-2xl mb-10 shadow-inner" role="tablist">
+            <button class="mode-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 active-mode text-white bg-rose-500 shadow-md" data-mode="pomodoro" role="tab" aria-selected="true">Pomodoro</button>
+            <button class="mode-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200" data-mode="shortBreak" role="tab" aria-selected="false">Short Break</button>
+            <button class="mode-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200" data-mode="longBreak" role="tab" aria-selected="false">Long Break</button>
+        </div>
+
+        <!-- Timer Display (SVG Ring) -->
+        <div class="relative flex justify-center items-center mb-10 group">
+            <!-- SVG Ring -->
+            <svg class="w-72 h-72 sm:w-80 sm:h-80 drop-shadow-xl" viewBox="0 0 280 280">
+                <!-- Background track -->
+                <circle cx="140" cy="140" r="130" stroke-width="8" fill="transparent" class="stroke-zinc-200 dark:stroke-zinc-800" />
+                <!-- Progress ring -->
+                <circle id="progressRing" class="progress-ring__circle stroke-rose-500" cx="140" cy="140" r="130" stroke-width="8" fill="transparent" stroke-linecap="round" />
+            </svg>
+            
+            <!-- Time Text -->
+            <div class="absolute flex flex-col items-center">
+                <div id="timeDisplay" class="font-display font-bold text-7xl sm:text-8xl tracking-tighter tabular-nums text-zinc-800 dark:text-white" aria-live="polite">25:00</div>
+                <div id="modeLabel" class="text-zinc-500 dark:text-zinc-400 font-medium tracking-widest uppercase text-sm mt-2">Focus</div>
+            </div>
+        </div>
+
+        <!-- Controls (NEW: added Skip & Extend/Snooze buttons) -->
+        <div class="flex gap-3 w-full mb-10">
+            <!-- Reset -->
+            <button id="btnReset" class="flex-none w-14 h-14 rounded-2xl bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all shadow-sm flex items-center justify-center text-xl" aria-label="Reset Timer">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+            
+            <!-- NEW: Extend / Snooze (+5 min) -->
+            <button id="btnExtend" class="flex-none w-14 h-14 rounded-2xl bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all shadow-sm flex items-center justify-center text-xl" aria-label="Snooze +5 min">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+            
+            <!-- NEW: Skip session -->
+            <button id="btnSkip" class="flex-none w-14 h-14 rounded-2xl bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 font-bold hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-all shadow-sm flex items-center justify-center text-xl" aria-label="Skip to next mode">
+                <i class="fa-solid fa-forward"></i>
+            </button>
+            
+            <!-- Start/Pause -->
+            <button id="btnStart" class="flex-1 h-14 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xl uppercase tracking-wider transition-all shadow-lg shadow-rose-500/30 active:scale-[0.98] flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play" id="startIcon"></i>
+                <span id="startText">Start</span>
+            </button>
+        </div>
+
+        <!-- Session & Stats -->
+        <div class="w-full bg-white dark:bg-zinc-900 rounded-2xl p-5 shadow-sm border border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+            <!-- Pomodoro Cycle Dots -->
+            <div class="flex flex-col gap-2">
+                <span class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider">Cycle</span>
+                <div class="flex gap-1.5" id="cycleDots">
+                    <div class="w-3 h-3 rounded-full bg-rose-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-700 transition-colors"></div>
+                    <div class="w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-700 transition-colors"></div>
+                    <div class="w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-700 transition-colors"></div>
+                </div>
+            </div>
+            
+            <!-- Divider -->
+            <div class="w-px h-10 bg-zinc-200 dark:bg-zinc-800"></div>
+
+            <!-- Daily & Streak -->
+            <div class="flex flex-col gap-1 text-right">
+                <div class="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                    <span id="dailyCount" class="text-rose-500 font-bold">0</span> Sessions Today
+                </div>
+                <div class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center justify-end gap-1">
+                    <i class="fa-solid fa-fire text-orange-500"></i>
+                    <span id="streakCount">0 Day Streak</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Accessibility Announcer -->
+        <div id="srAnnouncer" class="sr-only" aria-live="assertive"></div>
+
+        <!-- NEW: Hidden ambient audio player -->
+        <audio id="ambientAudio" loop preload="none"></audio>
+    </main>
+
+    <!-- ================= MODALS ================= -->
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/40 modal-backdrop transition-opacity opacity-0" id="settingsOverlay"></div>
+        <div class="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl z-10 overflow-hidden transform scale-95 opacity-0 transition-all duration-300 flex flex-col" id="settingsContent">
+            
+            <div class="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                <h2 class="font-display font-bold text-xl text-zinc-900 dark:text-white">Settings</h2>
+                <button class="close-modal text-zinc-400 hover:text-rose-500 transition-colors p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <div class="p-6 custom-scrollbar overflow-y-auto">
+                <h3 class="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4"><i class="fa-solid fa-clock mr-2"></i>Timer (Minutes)</h3>
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300 text-center">Focus</label>
+                        <input type="number" id="setPomodoro" min="1" max="120" class="w-full bg-zinc-100 dark:bg-zinc-800 border-none rounded-xl py-2 text-center font-bold text-zinc-900 dark:text-white focus:ring-2 focus:ring-rose-500 transition-shadow">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300 text-center">Short Break</label>
+                        <input type="number" id="setShortBreak" min="1" max="30" class="w-full bg-zinc-100 dark:bg-zinc-800 border-none rounded-xl py-2 text-center font-bold text-zinc-900 dark:text-white focus:ring-2 focus:ring-rose-500 transition-shadow">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-xs font-semibold text-zinc-600 dark:text-zinc-300 text-center">Long Break</label>
+                        <input type="number" id="setLongBreak" min="1" max="60" class="w-full bg-zinc-100 dark:bg-zinc-800 border-none rounded-xl py-2 text-center font-bold text-zinc-900 dark:text-white focus:ring-2 focus:ring-rose-500 transition-shadow">
+                    </div>
+                </div>
+
+                <!-- NEW: Audio & Sounds Section -->
+                <h3 class="text-sm font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4 mt-8"><i class="fa-solid fa-music mr-2"></i>Audio &amp; Sounds</h3>
+                <div class="space-y-8">
+                    
+                    <!-- Ambient Music -->
+                    <div class="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="font-medium text-zinc-900 dark:text-white">Background Ambient</div>
+                            <label class="switch">
+                                <input type="checkbox" id="ambientToggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                        <select id="ambientSelect" class="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl py-3 px-4 text-sm">
+                            <option value="none">None</option>
+                            <option value="rain">Rain</option>
+                            <option value="forest">Forest</option>
+                            <option value="lofi">LoFi Chill</option>
+                        </select>
+                        <div class="mt-5 flex items-center gap-3">
+                            <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400 w-12">Volume</span>
+                            <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5" class="flex-1">
+                        </div>
+                    </div>
+
+                    <!-- Custom Alarm -->
+                    <div class="bg-zinc-50 dark:bg-zinc-800/50 p-5 rounded-2xl">
+                        <div class="font-medium text-zinc-900 dark:text-white mb-3">Alarm Sound</div>
+                        <div class="flex gap-3">
+                            <label class="flex-1 cursor-pointer bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 hover:border-rose-500 transition-colors rounded-xl py-3 text-center text-sm font-medium">
+                                <i class="fa-solid fa-upload mr-2"></i> Upload Custom
+                                <input type="file" id="alarmUpload" accept="audio/*" class="hidden">
+                            </label>
+                            <button id="btnClearAlarm" class="px-5 bg-zinc-200 dark:bg-zinc-800 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-zinc-600 dark:text-zinc-400 rounded-xl text-sm font-medium transition-colors">
+                                Clear
+                            </button>
+                        </div>
+                        <p id="alarmStatus" class="text-xs text-emerald-600 dark:text-emerald-400 mt-3">Using default chime sound</p>
+                    </div>
+                </div>
+
+                <div class="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 text-sm text-zinc-600 dark:text-zinc-400">
+                    <h4 class="font-bold text-zinc-800 dark:text-zinc-200 mb-2"><i class="fa-regular fa-keyboard mr-2"></i>Keyboard Shortcuts</h4>
+                    <ul class="space-y-1.5 ml-6 list-disc marker:text-rose-500">
+                        <li><kbd class="px-1.5 py-0.5 bg-zinc-200 dark:bg-zinc-700 rounded text-xs font-mono">Space</kbd> Start / Pause</li>
+                        <li><kbd class="px-1.5 py-0.5 bg-zinc-200 dark:bg-zinc-700 rounded text-xs font-mono">R</kbd> Reset Timer</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                <button id="btnSaveSettings" class="w-full py-3 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats & History Modal -->
+    <div id="statsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/40 modal-backdrop transition-opacity opacity-0" id="statsOverlay"></div>
+        <div class="bg-white dark:bg-zinc-900 w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl z-10 overflow-hidden transform scale-95 opacity-0 transition-all duration-300 flex flex-col" id="statsContent">
+            
+            <div class="p-6 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 z-20">
+                <h2 class="font-display font-bold text-xl text-zinc-900 dark:text-white">Your Progress</h2>
+                <button class="close-modal text-zinc-400 hover:text-rose-500 transition-colors p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            
+            <!-- Stats Tabs -->
+            <div class="flex border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                <button class="stats-tab-btn flex-1 py-3 font-semibold text-sm border-b-2 border-rose-500 text-rose-500" data-target="tab-overview">Overview</button>
+                <button class="stats-tab-btn flex-1 py-3 font-semibold text-sm border-b-2 border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors" data-target="tab-history">History Log</button>
+            </div>
+
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-1 relative bg-white dark:bg-zinc-900">
+                
+                <!-- Tab: Overview (Chart & Summary) -->
+                <div id="tab-overview" class="stats-tab-content block animate-fade-in">
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                        <div class="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-stopwatch text-rose-500 mb-2 text-xl"></i>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase">Total Hours</span>
+                            <span class="text-xl font-bold text-zinc-900 dark:text-white mt-1" id="statTotalHours">0.0</span>
+                        </div>
+                        <div class="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-calendar-day text-rose-500 mb-2 text-xl"></i>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase">Avg/Day (m)</span>
+                            <span class="text-xl font-bold text-zinc-900 dark:text-white mt-1" id="statAvgMins">0</span>
+                        </div>
+                        <div class="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-check-double text-rose-500 mb-2 text-xl"></i>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase">Sessions</span>
+                            <span class="text-xl font-bold text-zinc-900 dark:text-white mt-1" id="statTotalSessions">0</span>
+                        </div>
+                        <div class="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex flex-col items-center justify-center text-center">
+                            <i class="fa-solid fa-fire text-orange-500 mb-2 text-xl"></i>
+                            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-semibold uppercase">Best Streak</span>
+                            <span class="text-xl font-bold text-zinc-900 dark:text-white mt-1" id="statBestStreak">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-zinc-800 dark:text-zinc-200">Focus Last 30 Days</h3>
+                            <button id="btnToggleChart" class="text-xs font-semibold px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                                Switch to Line
+                            </button>
+                        </div>
+                        <div class="w-full h-64 bg-white dark:bg-zinc-900">
+                            <canvas id="focusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: History Log -->
+                <div id="tab-history" class="stats-tab-content hidden animate-fade-in">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-zinc-800 dark:text-zinc-200">Recent Sessions</h3>
+                        <div class="flex gap-2">
+                            <button id="btnExport" class="text-xs font-semibold px-3 py-1 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-colors">
+                                <i class="fa-solid fa-download mr-1"></i> JSON
+                            </button>
+                            <!-- NEW: CSV Export -->
+                            <button id="btnExportCSV" class="text-xs font-semibold px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors">
+                                <i class="fa-solid fa-file-csv mr-1"></i> CSV
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="historyList" class="flex flex-col gap-3">
+                        <!-- History items injected here -->
+                        <div class="text-center py-10 text-zinc-400 dark:text-zinc-500 italic text-sm">No sessions recorded yet. Time to focus!</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            /* ==========================================================================
+               1. State & Constants (ENHANCED)
+               ========================================================================== */
+            const APP_VERSION = '2.0';
+            const STORAGE_KEY = 'focusFlow_data';
+            
+            const defaultSettings = { 
+                pomodoro: 25, 
+                shortBreak: 5, 
+                longBreak: 15,
+                customAlarm: null   // base64 dataURL for uploaded alarm
+            };
+            
+            const ambientPresets = {
+                none: { url: null, name: 'None' },
+                rain: { url: 'https://freesound.org/data/previews/202/202240_3660212-lq.mp3', name: 'Rain' },
+                forest: { url: 'https://freesound.org/data/previews/66/66935_634166-lq.mp3', name: 'Forest' },
+                lofi: { url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', name: 'LoFi Chill' }
+            };
+
+            const state = {
+                mode: 'pomodoro',
+                timeLeft: 25 * 60,
+                totalTime: 25 * 60,
+                isRunning: false,
+                expectedEndTime: 0,
+                intervalId: null,
+                sessionsCompleted: 0,
+                settings: { ...defaultSettings },
+                history: [],
+                theme: 'dark',
+                volume: 0.5,
+                ambientTrack: 'none',
+                ambientPlaying: false,
+                currentCategory: 'Work'   // NEW: task category/tag
+            };
+
+            /* ==========================================================================
+               2. DOM Elements (ENHANCED with new IDs)
+               ========================================================================== */
+            const DOM = {
+                html: document.documentElement,
+                timeDisplay: document.getElementById('timeDisplay'),
+                modeLabel: document.getElementById('modeLabel'),
+                progressRing: document.getElementById('progressRing'),
+                taskInput: document.getElementById('taskInput'),
+                cycleDots: document.getElementById('cycleDots'),
+                dailyCount: document.getElementById('dailyCount'),
+                streakCount: document.getElementById('streakCount'),
+                srAnnouncer: document.getElementById('srAnnouncer'),
+                ambientAudio: document.getElementById('ambientAudio'),
+                
+                // Buttons
+                btnStart: document.getElementById('btnStart'),
+                startIcon: document.getElementById('startIcon'),
+                startText: document.getElementById('startText'),
+                btnReset: document.getElementById('btnReset'),
+                btnExtend: document.getElementById('btnExtend'),     // NEW
+                btnSkip: document.getElementById('btnSkip'),         // NEW
+                btnTheme: document.getElementById('btnTheme'),
+                themeIcon: document.getElementById('themeIcon'),
+                btnStats: document.getElementById('btnStats'),
+                btnSettings: document.getElementById('btnSettings'),
+                btnSaveSettings: document.getElementById('btnSaveSettings'),
+                btnToggleChart: document.getElementById('btnToggleChart'),
+                btnExport: document.getElementById('btnExport'),
+                btnExportCSV: document.getElementById('btnExportCSV'), // NEW
+                modeBtns: document.querySelectorAll('.mode-btn'),
+                statsTabs: document.querySelectorAll('.stats-tab-btn'),
+                closeModals: document.querySelectorAll('.close-modal'),
+                categoryTags: document.querySelectorAll('.tag-btn'),
+                
+                // Modals
+                settingsModal: document.getElementById('settingsModal'),
+                settingsOverlay: document.getElementById('settingsOverlay'),
+                settingsContent: document.getElementById('settingsContent'),
+                statsModal: document.getElementById('statsModal'),
+                statsOverlay: document.getElementById('statsOverlay'),
+                statsContent: document.getElementById('statsContent'),
+                
+                // Inputs
+                inPomodoro: document.getElementById('setPomodoro'),
+                inShortBreak: document.getElementById('setShortBreak'),
+                inLongBreak: document.getElementById('setLongBreak'),
+                ambientToggle: document.getElementById('ambientToggle'),
+                ambientSelect: document.getElementById('ambientSelect'),
+                volumeSlider: document.getElementById('volumeSlider'),
+                alarmUpload: document.getElementById('alarmUpload'),
+                btnClearAlarm: document.getElementById('btnClearAlarm'),
+                alarmStatus: document.getElementById('alarmStatus'),
+                
+                // Stats UI
+                statTotalHours: document.getElementById('statTotalHours'),
+                statAvgMins: document.getElementById('statAvgMins'),
+                statTotalSessions: document.getElementById('statTotalSessions'),
+                statBestStreak: document.getElementById('statBestStreak'),
+                historyList: document.getElementById('historyList'),
+                chartCanvas: document.getElementById('focusChart')
+            };
+
+            /* ==========================================================================
+               3. SVG Circle Setup (unchanged)
+               ========================================================================== */
+            const radius = DOM.progressRing.r.baseVal.value;
+            const circumference = radius * 2 * Math.PI;
+            DOM.progressRing.style.strokeDasharray = `${circumference} ${circumference}`;
+            DOM.progressRing.style.strokeDashoffset = 0;
+
+            const setProgress = (percent) => {
+                const offset = circumference - (percent / 100) * circumference;
+                DOM.progressRing.style.strokeDashoffset = offset;
+            };
+
+            /* ==========================================================================
+               4. Storage & State Management (ENHANCED with new fields)
+               ========================================================================== */
+            const Storage = {
+                load: () => {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                        if (data) {
+                            state.settings = data.settings || { ...defaultSettings };
+                            state.history = data.history || [];
+                            state.sessionsCompleted = data.sessionsCompleted || 0;
+                            state.theme = data.theme || 'dark';
+                            state.volume = data.volume || 0.5;
+                            state.ambientTrack = data.ambientTrack || 'none';
+                            state.currentCategory = data.currentCategory || 'Work';
+                            
+                            if (data.task) DOM.taskInput.value = data.task;
+                            
+                            // Restore running timer state
+                            if (data.timer) {
+                                state.mode = data.timer.mode || 'pomodoro';
+                                state.totalTime = state.settings[state.mode] * 60;
+                                if (data.timer.isRunning) {
+                                    const now = Date.now();
+                                    if (data.timer.expectedEndTime > now) {
+                                        state.isRunning = true;
+                                        state.expectedEndTime = data.timer.expectedEndTime;
+                                        state.timeLeft = Math.ceil((state.expectedEndTime - now) / 1000);
+                                    } else {
+                                        state.timeLeft = 0;
+                                        Timer.complete(true);
+                                    }
+                                } else {
+                                    state.timeLeft = data.timer.timeLeft ?? state.totalTime;
+                                }
+                            } else {
+                                state.timeLeft = state.totalTime = state.settings.pomodoro * 60;
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to load local storage", e);
+                    }
+                },
+                save: () => {
+                    const data = {
+                        version: APP_VERSION,
+                        settings: state.settings,
+                        history: state.history,
+                        sessionsCompleted: state.sessionsCompleted,
+                        theme: state.theme,
+                        volume: state.volume,
+                        ambientTrack: state.ambientTrack,
+                        currentCategory: state.currentCategory,
+                        task: DOM.taskInput.value,
+                        timer: {
+                            mode: state.mode,
+                            isRunning: state.isRunning,
+                            expectedEndTime: state.expectedEndTime,
+                            timeLeft: state.timeLeft
+                        }
+                    };
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                },
+                addHistory: (mode, durationMins) => {
+                    const today = new Date();
+                    const dateStr = today.toLocaleDateString('en-CA');
+                    state.history.push({
+                        id: Date.now().toString(36),
+                        date: dateStr,
+                        timestamp: Date.now(),
+                        task: DOM.taskInput.value || 'Focus Session',
+                        duration: durationMins,
+                        mode: mode,
+                        category: state.currentCategory   // NEW
+                    });
+                    Storage.save();
+                }
+            };
+
+            /* ==========================================================================
+               5. Audio Manager (FULLY ENHANCED)
+               ========================================================================== */
+            const AudioManager = {
+                playAlarm: () => {
+                    try {
+                        if (state.settings.customAlarm) {
+                            const customAudio = new Audio(state.settings.customAlarm);
+                            customAudio.volume = state.volume;
+                            customAudio.play().catch(() => {});
+                            return;
+                        }
+                        // Default chime (original oscillator)
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(880, ctx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 1.5);
+                        gain.gain.setValueAtTime(0.5 * state.volume, ctx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+                        osc.start(ctx.currentTime);
+                        osc.stop(ctx.currentTime + 1.5);
+                    } catch (e) { console.warn("Audio disabled"); }
+                },
+                notify: (title, body) => {
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        new Notification(title, { body, icon: "https://fav.farm/🍅" });
+                    }
+                    DOM.srAnnouncer.textContent = `${title}. ${body}`;
+                },
+                requestPerms: () => {
+                    if ("Notification" in window && Notification.permission === "default") {
+                        Notification.requestPermission();
+                    }
+                },
+                updateAmbient: () => {
+                    const player = DOM.ambientAudio;
+                    player.volume = state.volume;
+                    if (state.ambientTrack === 'none' || !state.ambientPlaying) {
+                        player.pause();
+                        return;
+                    }
+                    const preset = ambientPresets[state.ambientTrack];
+                    if (preset && preset.url) {
+                        if (player.src !== preset.url) player.src = preset.url;
+                        player.play().catch(() => {});
+                    }
+                }
+            };
+
+            /* ==========================================================================
+               6. UI Updates (ENHANCED)
+               ========================================================================== */
+            const UI = {
+                init: () => {
+                    UI.applyTheme(state.theme);
+                    UI.updateDisplay();
+                    UI.updateModeTabs();
+                    UI.updateStatsUI();
+                    UI.updateCategoryTags();
+                    
+                    // Populate Settings
+                    DOM.inPomodoro.value = state.settings.pomodoro;
+                    DOM.inShortBreak.value = state.settings.shortBreak;
+                    DOM.inLongBreak.value = state.settings.longBreak;
+                    DOM.ambientSelect.value = state.ambientTrack;
+                    DOM.volumeSlider.value = state.volume;
+                    DOM.ambientToggle.checked = state.ambientPlaying;
+                    
+                    if (state.settings.customAlarm) {
+                        DOM.alarmStatus.textContent = "Custom alarm loaded";
+                    }
+                    
+                    if (state.isRunning) {
+                        UI.setBtnStart(true);
+                        state.intervalId = setInterval(Timer.tick, 100);
+                    }
+                    
+                    // Start ambient if was playing
+                    AudioManager.updateAmbient();
+                },
+                applyTheme: (theme) => {
+                    if (theme === 'dark') {
+                        DOM.html.classList.add('dark');
+                        DOM.themeIcon.className = 'fa-solid fa-sun';
+                    } else {
+                        DOM.html.classList.remove('dark');
+                        DOM.themeIcon.className = 'fa-solid fa-moon';
+                    }
+                    if (chartInstance) ChartManager.render();
+                },
+                updateDisplay: () => {
+                    const m = Math.floor(state.timeLeft / 60).toString().padStart(2, '0');
+                    const s = (state.timeLeft % 60).toString().padStart(2, '0');
+                    const timeStr = `${m}:${s}`;
+                    
+                    DOM.timeDisplay.textContent = timeStr;
+                    document.title = `${timeStr} - ${state.mode === 'pomodoro' ? 'Focus' : 'Break'}`;
+                    
+                    const percent = state.totalTime > 0 ? (state.timeLeft / state.totalTime) * 100 : 0;
+                    setProgress(percent);
+                },
+                updateModeTabs: () => { /* unchanged from original */ 
+                    // ... (kept exactly as original for compatibility)
+                    DOM.modeBtns.forEach(btn => {
+                        const isMatch = btn.dataset.mode === state.mode;
+                        btn.setAttribute('aria-selected', isMatch);
+                        if (isMatch) {
+                            btn.className = 'mode-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 active-mode text-white bg-rose-500 shadow-md';
+                            DOM.modeLabel.textContent = btn.textContent;
+                            DOM.progressRing.classList.remove('stroke-rose-500', 'stroke-emerald-500', 'stroke-blue-500');
+                            if (state.mode === 'pomodoro') DOM.progressRing.classList.add('stroke-rose-500');
+                            if (state.mode === 'shortBreak') DOM.progressRing.classList.add('stroke-emerald-500');
+                            if (state.mode === 'longBreak') DOM.progressRing.classList.add('stroke-blue-500');
+                        } else {
+                            btn.className = 'mode-btn flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200';
+                        }
+                    });
+                },
+                setBtnStart: (isRunning) => { /* unchanged */ 
+                    // ... (original code)
+                    if (isRunning) {
+                        DOM.startIcon.className = 'fa-solid fa-pause';
+                        DOM.startText.textContent = 'Pause';
+                        DOM.btnStart.classList.replace('bg-rose-500', 'bg-zinc-800');
+                        DOM.btnStart.classList.replace('hover:bg-rose-600', 'hover:bg-zinc-700');
+                        DOM.btnStart.classList.remove('shadow-rose-500/30');
+                        DOM.btnStart.classList.add('shadow-zinc-800/30', 'dark:bg-zinc-200', 'dark:text-zinc-900', 'dark:hover:bg-white');
+                    } else {
+                        DOM.startIcon.className = 'fa-solid fa-play ml-1';
+                        DOM.startText.textContent = 'Start';
+                        DOM.btnStart.classList.replace('bg-zinc-800', 'bg-rose-500');
+                        DOM.btnStart.classList.replace('hover:bg-zinc-700', 'hover:bg-rose-600');
+                        DOM.btnStart.classList.remove('shadow-zinc-800/30', 'dark:bg-zinc-200', 'dark:text-zinc-900', 'dark:hover:bg-white');
+                        DOM.btnStart.classList.add('shadow-rose-500/30');
+                    }
+                },
+                updateStatsUI: () => { /* unchanged + category support already in history */ 
+                    // ... (original)
+                    const dots = Array.from(DOM.cycleDots.children);
+                    const cycle = state.sessionsCompleted % 4;
+                    dots.forEach((dot, i) => {
+                        dot.className = (i < cycle || (cycle === 0 && state.sessionsCompleted > 0 && state.mode !== 'pomodoro')) 
+                            ? 'w-3 h-3 rounded-full bg-rose-500 transition-colors' 
+                            : 'w-3 h-3 rounded-full bg-zinc-200 dark:bg-zinc-700 transition-colors';
+                    });
+                    if (state.mode === 'longBreak' && cycle === 0) {
+                        dots.forEach(d => d.className = 'w-3 h-3 rounded-full bg-rose-500 transition-colors');
+                    }
+
+                    const todayStr = new Date().toLocaleDateString('en-CA');
+                    const todaySessions = state.history.filter(h => h.date === todayStr && h.mode === 'pomodoro').length;
+                    DOM.dailyCount.textContent = todaySessions;
+
+                    const streak = calculateStreak();
+                    DOM.streakCount.textContent = `${streak} Day${streak !== 1 ? 's' : ''} Streak`;
+                },
+                updateCategoryTags: () => {
+                    DOM.categoryTags.forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.category === state.currentCategory);
+                    });
+                }
+            };
+
+            /* ==========================================================================
+               7. Data Processing & Chart (unchanged)
+               ========================================================================== */
+            let chartInstance = null;
+            let currentChartType = 'bar';
+
+            const calculateStreak = () => { /* original */ 
+                // ... (kept exactly as original)
+                if (state.history.length === 0) return 0;
+                const focusDates = [...new Set(state.history.filter(h => h.mode === 'pomodoro').map(h => h.date))].sort((a,b) => new Date(b) - new Date(a));
+                if (focusDates.length === 0) return 0;
+                const today = new Date(); today.setHours(0,0,0,0);
+                let streak = 0;
+                let currentCheckDate = new Date(today);
+                if (!focusDates.includes(currentCheckDate.toLocaleDateString('en-CA'))) {
+                    currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+                    if (!focusDates.includes(currentCheckDate.toLocaleDateString('en-CA'))) return 0;
+                }
+                while(focusDates.includes(currentCheckDate.toLocaleDateString('en-CA'))) {
+                    streak++;
+                    currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+                }
+                return streak;
+            };
+
+            const ChartManager = {
+                processData: () => { /* original */ 
+                    // ... (kept)
+                    const days = 30;
+                    const labels = [];
+                    const dataPoints = [];
+                    const today = new Date();
+                    let totalMins = 0;
+                    let activeDaysCount = 0;
+
+                    for (let i = days - 1; i >= 0; i--) {
+                        const d = new Date(today);
+                        d.setDate(d.getDate() - i);
+                        const dateStr = d.toLocaleDateString('en-CA');
+                        labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+                        const dayHistory = state.history.filter(h => h.date === dateStr && h.mode === 'pomodoro');
+                        const dayMins = dayHistory.reduce((sum, h) => sum + h.duration, 0);
+                        dataPoints.push(dayMins);
+                        totalMins += dayMins;
+                        if (dayMins > 0) activeDaysCount++;
+                    }
+
+                    const totalHours = (totalMins / 60).toFixed(1);
+                    const avgMins = activeDaysCount > 0 ? Math.round(totalMins / activeDaysCount) : 0;
+                    const totalSessions = state.history.filter(h => h.mode === 'pomodoro').length;
+                    
+                    DOM.statTotalHours.textContent = totalHours;
+                    DOM.statAvgMins.textContent = avgMins;
+                    DOM.statTotalSessions.textContent = totalSessions;
+                    DOM.statBestStreak.textContent = calculateStreak();
+
+                    return { labels, dataPoints };
+                },
+                render: () => { /* original */ 
+                    // ... (kept)
+                    const { labels, dataPoints } = ChartManager.processData();
+                    const isDark = DOM.html.classList.contains('dark');
+                    const textColor = isDark ? '#a1a1aa' : '#71717a';
+                    const gridColor = isDark ? '#27272a' : '#f4f4f5';
+                    const brandColor = '#f43f5e';
+
+                    if (chartInstance) chartInstance.destroy();
+
+                    chartInstance = new Chart(DOM.chartCanvas, {
+                        type: currentChartType,
+                        data: { labels, datasets: [{ label: 'Focus Minutes', data: dataPoints, backgroundColor: currentChartType === 'bar' ? brandColor : 'rgba(244, 63, 94, 0.1)', borderColor: brandColor, borderWidth: 2, borderRadius: currentChartType === 'bar' ? 4 : 0, fill: currentChartType === 'line', tension: 0.4, pointBackgroundColor: isDark ? '#18181b' : '#ffffff', pointBorderWidth: 2, pointRadius: currentChartType === 'line' ? 3 : 0, pointHoverRadius: 6 }] },
+                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: isDark ? '#27272a' : '#ffffff', titleColor: isDark ? '#ffffff' : '#18181b', bodyColor: isDark ? '#a1a1aa' : '#71717a', borderColor: gridColor, borderWidth: 1, padding: 10, displayColors: false, callbacks: { label: (ctx) => `${ctx.raw} minutes` } } }, scales: { x: { grid: { display: false }, ticks: { color: textColor, maxTicksLimit: 7, font: { family: 'Inter' } } }, y: { border: { display: false }, grid: { color: gridColor }, ticks: { color: textColor, font: { family: 'Inter' }, stepSize: 25 }, beginAtZero: true } }, interaction: { intersect: false, mode: 'index' } }
+                    });
+                },
+                renderHistoryList: () => {
+                    DOM.historyList.innerHTML = '';
+                    const sortedHistory = [...state.history].sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
+                    
+                    if (sortedHistory.length === 0) {
+                        DOM.historyList.innerHTML = `<div class="text-center py-10 text-zinc-400 dark:text-zinc-500 italic text-sm">No sessions recorded yet. Time to focus!</div>`;
+                        return;
+                    }
+
+                    sortedHistory.forEach(item => {
+                        const dateObj = new Date(item.timestamp);
+                        const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        const dateStr = dateObj.toLocaleDateString([], {month: 'short', day: 'numeric'});
+                        
+                        const icon = item.mode === 'pomodoro' ? 'fa-fire text-rose-500' : 'fa-mug-hot text-emerald-500';
+                        const modeText = item.mode === 'pomodoro' ? 'Focus' : 'Break';
+
+                        const el = document.createElement('div');
+                        el.className = "p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 flex justify-between items-center";
+                        el.innerHTML = `
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 rounded-full bg-white dark:bg-zinc-900 shadow-sm flex items-center justify-center">
+                                    <i class="fa-solid ${icon}"></i>
+                                </div>
+                                <div>
+                                    <p class="font-semibold text-sm text-zinc-900 dark:text-white">${item.task || 'Untitled Session'}</p>
+                                    <p class="text-xs text-zinc-500 dark:text-zinc-400">${dateStr} • ${timeStr} • ${modeText}</p>
+                                    ${item.category ? `<span class="inline-block mt-1 px-3 py-0.5 text-[10px] bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full">${item.category}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="font-bold text-zinc-800 dark:text-zinc-200">${item.duration}m</div>
+                        `;
+                        DOM.historyList.appendChild(el);
+                    });
+                }
+            };
+
+            /* ==========================================================================
+               8. Timer Logic (ENHANCED with Skip & Extend)
+               ========================================================================== */
+            const Timer = {
+                switchMode: (newMode) => {
+                    Timer.pause();
+                    state.mode = newMode;
+                    state.totalTime = state.settings[newMode] * 60;
+                    state.timeLeft = state.totalTime;
+                    UI.updateModeTabs();
+                    UI.updateDisplay();
+                    Storage.save();
+                },
+                start: () => {
+                    if (state.isRunning || state.timeLeft <= 0) return;
+                    AudioManager.requestPerms();
+                    state.isRunning = true;
+                    state.expectedEndTime = Date.now() + (state.timeLeft * 1000);
+                    UI.setBtnStart(true);
+                    Storage.save();
+                    state.intervalId = setInterval(Timer.tick, 100);
+                },
+                pause: () => {
+                    if (!state.isRunning) return;
+                    state.isRunning = false;
+                    clearInterval(state.intervalId);
+                    UI.setBtnStart(false);
+                    Storage.save();
+                },
+                reset: () => {
+                    Timer.pause();
+                    state.timeLeft = state.totalTime;
+                    UI.updateDisplay();
+                    Storage.save();
+                },
+                extend: (minutes) => {   // NEW: Snooze / Extend current session
+                    const secs = minutes * 60;
+                    state.timeLeft += secs;
+                    if (state.isRunning) {
+                        state.expectedEndTime += secs * 1000;
+                    }
+                    UI.updateDisplay();
+                    Storage.save();
+                },
+                skip: () => {   // NEW: Skip to next mode without counting as completed
+                    Timer.pause();
+                    let nextMode = 'pomodoro';
+                    if (state.mode === 'pomodoro') {
+                        const cycle = state.sessionsCompleted % 4;
+                        nextMode = (cycle === 3) ? 'longBreak' : 'shortBreak';
+                    }
+                    Timer.switchMode(nextMode);
+                },
+                tick: () => {
+                    const now = Date.now();
+                    const remainingMs = state.expectedEndTime - now;
+                    if (remainingMs <= 0) {
+                        Timer.complete(false);
+                    } else {
+                        const newSeconds = Math.ceil(remainingMs / 1000);
+                        if (newSeconds !== state.timeLeft) {
+                            state.timeLeft = newSeconds;
+                            UI.updateDisplay();
+                        }
+                        const percent = ((state.totalTime * 1000 - remainingMs) / (state.totalTime * 1000)) * 100;
+                        setProgress(100 - percent);
+                    }
+                },
+                complete: (isSilent) => {
+                    Timer.pause();
+                    state.timeLeft = 0;
+                    UI.updateDisplay();
+                    
+                    if (state.mode === 'pomodoro') {
+                        state.sessionsCompleted++;
+                        Storage.addHistory('pomodoro', state.settings.pomodoro);
+                    } else {
+                        Storage.addHistory(state.mode, state.settings[state.mode]);
+                    }
+
+                    UI.updateStatsUI();
+
+                    if (!isSilent) {
+                        AudioManager.playAlarm();
+                        let title, body, nextMode;
+
+                        if (state.mode === 'pomodoro') {
+                            if (state.sessionsCompleted % 4 === 0) {
+                                nextMode = 'longBreak';
+                                title = "Long Break Time!";
+                                body = "Great focus! Take a longer rest.";
+                            } else {
+                                nextMode = 'shortBreak';
+                                title = "Short Break!";
+                                body = "Good job. Time for a quick breather.";
+                            }
+                        } else {
+                            nextMode = 'pomodoro';
+                            title = "Break is over!";
+                            body = "Ready to focus again?";
+                        }
+
+                        AudioManager.notify(title, body);
+
+                        setTimeout(() => {
+                            Timer.switchMode(nextMode);
+                            Timer.start();
+                        }, 2000);
+                    }
+                }
+            };
+
+            /* ==========================================================================
+               9. Export Helpers (NEW)
+               ========================================================================== */
+            const Export = {
+                toCSV: () => {
+                    let csvContent = "Date,Time,Task,Category,Duration,Mode\n";
+                    state.history.forEach(item => {
+                        const dateObj = new Date(item.timestamp);
+                        const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        const taskClean = (item.task || 'Untitled').replace(/,/g, ' ');
+                        csvContent += `"${item.date}","${timeStr}","${taskClean}","${item.category || 'Focus'}",${item.duration},"${item.mode}"\n`;
+                    });
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `focusflow_history_${new Date().toISOString().slice(0,10)}.csv`;
+                    link.click();
+                }
+            };
+
+            /* ==========================================================================
+               10. Modals & Events (ENHANCED)
+               ========================================================================== */
+            const ModalConfig = {
+                open: (modal, overlay, content) => {
+                    modal.classList.remove('hidden');
+                    setTimeout(() => {
+                        overlay.classList.remove('opacity-0');
+                        content.classList.remove('opacity-0', 'scale-95');
+                        content.classList.add('opacity-100', 'scale-100');
+                    }, 10);
+                },
+                close: (modal, overlay, content) => {
+                    overlay.classList.add('opacity-0');
+                    content.classList.remove('opacity-100', 'scale-100');
+                    content.classList.add('opacity-0', 'scale-95');
+                    setTimeout(() => modal.classList.add('hidden'), 300);
+                }
+            };
+
+            const attachEvents = () => {
+                // Controls (original + new)
+                DOM.btnStart.addEventListener('click', () => state.isRunning ? Timer.pause() : Timer.start());
+                DOM.btnReset.addEventListener('click', Timer.reset);
+                DOM.btnExtend.addEventListener('click', () => Timer.extend(5));   // +5 min snooze
+                DOM.btnSkip.addEventListener('click', Timer.skip);               // skip session
+                
+                DOM.modeBtns.forEach(btn => {
+                    btn.addEventListener('click', (e) => Timer.switchMode(e.target.dataset.mode));
+                });
+
+                // Task + Category
+                DOM.taskInput.addEventListener('input', Storage.save);
+                DOM.categoryTags.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.currentCategory = btn.dataset.category;
+                        UI.updateCategoryTags();
+                        Storage.save();
+                    });
+                });
+
+                // Theme
+                DOM.btnTheme.addEventListener('click', () => {
+                    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+                    UI.applyTheme(state.theme);
+                    Storage.save();
+                });
+
+                // Modals
+                DOM.btnSettings.addEventListener('click', () => {
+                    DOM.inPomodoro.value = state.settings.pomodoro;
+                    DOM.inShortBreak.value = state.settings.shortBreak;
+                    DOM.inLongBreak.value = state.settings.longBreak;
+                    DOM.ambientSelect.value = state.ambientTrack;
+                    DOM.volumeSlider.value = state.volume;
+                    DOM.ambientToggle.checked = state.ambientPlaying;
+                    ModalConfig.open(DOM.settingsModal, DOM.settingsOverlay, DOM.settingsContent);
+                });
+                
+                DOM.btnStats.addEventListener('click', () => {
+                    ChartManager.render();
+                    ChartManager.renderHistoryList();
+                    ModalConfig.open(DOM.statsModal, DOM.statsOverlay, DOM.statsContent);
+                });
+
+                DOM.closeModals.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        ModalConfig.close(DOM.settingsModal, DOM.settingsOverlay, DOM.settingsContent);
+                        ModalConfig.close(DOM.statsModal, DOM.statsOverlay, DOM.statsContent);
+                    });
+                });
+
+                DOM.settingsOverlay.addEventListener('click', () => ModalConfig.close(DOM.settingsModal, DOM.settingsOverlay, DOM.settingsContent));
+                DOM.statsOverlay.addEventListener('click', () => ModalConfig.close(DOM.statsModal, DOM.statsOverlay, DOM.statsContent));
+
+                // Save Settings
+                DOM.btnSaveSettings.addEventListener('click', () => {
+                    const p = Math.max(1, Math.min(120, parseInt(DOM.inPomodoro.value) || 25));
+                    const sb = Math.max(1, Math.min(30, parseInt(DOM.inShortBreak.value) || 5));
+                    const lb = Math.max(1, Math.min(60, parseInt(DOM.inLongBreak.value) || 15));
+                    
+                    state.settings.pomodoro = p;
+                    state.settings.shortBreak = sb;
+                    state.settings.longBreak = lb;
+                    Storage.save();
+                    
+                    if (!state.isRunning) Timer.switchMode(state.mode);
+                    
+                    const ogText = DOM.btnSaveSettings.textContent;
+                    DOM.btnSaveSettings.textContent = "Saved Successfully!";
+                    DOM.btnSaveSettings.classList.add('bg-emerald-500', 'text-white');
+                    setTimeout(() => {
+                        DOM.btnSaveSettings.textContent = ogText;
+                        DOM.btnSaveSettings.classList.remove('bg-emerald-500', 'text-white');
+                        ModalConfig.close(DOM.settingsModal, DOM.settingsOverlay, DOM.settingsContent);
+                    }, 1000);
+                });
+
+                // NEW: Ambient & Volume Controls
+                DOM.ambientToggle.addEventListener('change', (e) => {
+                    state.ambientPlaying = e.target.checked;
+                    AudioManager.updateAmbient();
+                    Storage.save();
+                });
+                DOM.ambientSelect.addEventListener('change', (e) => {
+                    state.ambientTrack = e.target.value;
+                    AudioManager.updateAmbient();
+                    Storage.save();
+                });
+                DOM.volumeSlider.addEventListener('input', (e) => {
+                    state.volume = parseFloat(e.target.value);
+                    AudioManager.updateAmbient();
+                    Storage.save();
+                });
+
+                // NEW: Custom Alarm Upload
+                DOM.alarmUpload.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        state.settings.customAlarm = ev.target.result; // base64
+                        DOM.alarmStatus.textContent = `Custom: ${file.name}`;
+                        Storage.save();
+                    };
+                    reader.readAsDataURL(file);
+                });
+                DOM.btnClearAlarm.addEventListener('click', () => {
+                    state.settings.customAlarm = null;
+                    DOM.alarmStatus.textContent = "Using default chime sound";
+                    Storage.save();
+                });
+
+                // Stats Tabs & Export (original + CSV)
+                DOM.statsTabs.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        DOM.statsTabs.forEach(t => {
+                            t.classList.remove('border-rose-500', 'text-rose-500');
+                            t.classList.add('border-transparent', 'text-zinc-500', 'dark:text-zinc-400');
+                        });
+                        document.querySelectorAll('.stats-tab-content').forEach(c => {
+                            c.classList.toggle('hidden', c.id !== e.target.dataset.target);
+                            c.classList.toggle('block', c.id === e.target.dataset.target);
+                        });
+                        e.target.classList.add('border-rose-500', 'text-rose-500');
+                    });
+                });
+                DOM.btnToggleChart.addEventListener('click', () => {
+                    currentChartType = currentChartType === 'bar' ? 'line' : 'bar';
+                    DOM.btnToggleChart.textContent = currentChartType === 'bar' ? 'Switch to Line' : 'Switch to Bar';
+                    ChartManager.render();
+                });
+                DOM.btnExport.addEventListener('click', () => {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state.history, null, 2));
+                    const a = document.createElement('a');
+                    a.href = dataStr;
+                    a.download = `focusflow_history_${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                });
+                DOM.btnExportCSV.addEventListener('click', Export.toCSV);   // NEW
+
+                // Keyboard Shortcuts (original)
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT') return;
+                    if (!DOM.settingsModal.classList.contains('hidden') || !DOM.statsModal.classList.contains('hidden')) return;
+                    
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        state.isRunning ? Timer.pause() : Timer.start();
+                    } else if (e.code === 'KeyR') {
+                        Timer.reset();
+                    }
+                });
+
+                // NEW: Auto-pause when tab is inactive (visibility API)
+                let wasRunningBeforeHide = false;
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        if (state.isRunning) {
+                            wasRunningBeforeHide = true;
+                            Timer.pause();
+                        }
+                    } else if (wasRunningBeforeHide) {
+                        Timer.start();
+                        wasRunningBeforeHide = false;
+                    }
+                });
+            };
+
+            /* ==========================================================================
+               11. Boot App
+               ========================================================================== */
+            Storage.load();
+            UI.init();
+            attachEvents();
+
+            // Final safety: update ambient once more after full init
+            setTimeout(() => AudioManager.updateAmbient(), 300);
+        });
+    </script>
+</body>
+</html>
